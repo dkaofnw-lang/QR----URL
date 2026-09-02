@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR 코드 변환기</title>
+    <!-- QR 코드 생성 및 스캔 라이브러리 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background-color: #f5f7fb;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            max-width: 900px;
+            width: 100%;
+        }
+        .card {
+            background: #ffffff;
+            flex: 1;
+            min-width: 320px;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+        h2 {
+            font-size: 1.25rem;
+            color: #333;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        /* 드롭 & 붙여넣기 영역 */
+        .drop-zone {
+            width: 100%;
+            height: 160px;
+            border: 2px dashed #a0aec0;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: #718096;
+            text-align: center;
+            cursor: pointer;
+            background-color: #fafafa;
+            transition: all 0.2s ease;
+            outline: none;
+            user-select: none;
+        }
+        .drop-zone:focus, .drop-zone.dragover {
+            border-color: #4c51bf;
+            background-color: #ebf8ff;
+        }
+        input[type="file"] {
+            display: none;
+        }
+        /* 결과 박스 */
+        .result-box {
+            margin-top: 15px;
+            padding: 12px;
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            word-break: break-all;
+            min-height: 70px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .link-wrapper {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+        .link-wrapper a {
+            color: #3182ce;
+            text-decoration: none;
+            font-weight: bold;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .link-wrapper a:hover {
+            text-decoration: underline;
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            background-color: #edf2f7;
+            border: 1px solid #cbd5e0;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            white-space: nowrap;
+        }
+        .btn-sm:hover {
+            background-color: #e2e8f0;
+        }
+        /* 히스토리 */
+        .history-section {
+            margin-top: 15px;
+            border-top: 1px solid #edf2f7;
+            padding-top: 10px;
+        }
+        .history-title {
+            font-size: 0.85rem;
+            font-weight: bold;
+            color: #718096;
+            margin-bottom: 8px;
+        }
+        .history-list {
+            list-style: none;
+            font-size: 0.8rem;
+        }
+        .history-list li {
+            padding: 4px 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .history-list a {
+            color: #4a5568;
+            text-decoration: none;
+        }
+        .history-list a:hover {
+            color: #3182ce;
+        }
+        /* 우측 URL -> QR */
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e0;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            font-size: 0.95rem;
+        }
+        .action-btn {
+            width: 100%;
+            padding: 12px;
+            background-color: #4c51bf;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+        .action-btn:hover {
+            background-color: #434190;
+        }
+        #qrcode {
+            display: flex;
+            justify-content: center;
+            margin-top: 15px;
+        }
+        canvas {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <!-- 기능 1: QR 이미지 -> 링크 추출 -->
+    <div class="card">
+        <h2>QR 이미지 ➔ 링크 변환</h2>
+        
+        <!-- 업로드 & 붙여넣기 구역 -->
+        <div class="drop-zone" id="dropZone" tabindex="0">
+            <span>클릭하여 파일 선택 / 이미지 드래그<br><strong>Ctrl + V (붙여넣기)</strong> 지원</span>
+        </div>
+        <input type="file" id="fileInput" accept="image/*">
+
+        <!-- 결과 표시 -->
+        <div class="result-box" id="resultBox"></div>
+
+        <!-- 스캔 기록 히스토리 -->
+        <div class="history-section">
+            <div class="history-title">최근 스캔 기록</div>
+            <ul class="history-list" id="historyList"></ul>
+        </div>
+    </div>
+
+    <!-- 기능 2: URL -> QR 코드 생성 -->
+    <div class="card">
+        <h2>URL ➔ QR 코드 생성</h2>
+        <input type="text" id="urlInput" placeholder="https://example.com 입력">
+        <button class="action-btn" onclick="generateQRCode()">QR 코드 생성</button>
+        <div id="qrcode"></div>
+    </div>
+</div>
+
+<canvas id="hiddenCanvas"></canvas>
+
+<script>
+    const dropZone = document.getElementById('dropZone');
+    const fileInput = document.getElementById('fileInput');
+    const resultBox = document.getElementById('resultBox');
+    const historyList = document.getElementById('historyList');
+    const canvas = document.getElementById('hiddenCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let history = JSON.parse(localStorage.getItem('qr_history') || '[]');
+
+    // 초기화
+    renderHistory();
+
+    // 1. 드롭존 클릭 시 파일 창
+    dropZone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) processFile(e.target.files[0]);
+    });
+
+    // 2. 드래그 앤 드롭
+    dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('dragover');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+    dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('dragover');
+        if (e.dataTransfer.files.length > 0) processFile(e.dataTransfer.files[0]);
+    });
+
+    // 3. 붙여넣기 (Paste)
+    document.addEventListener('paste', (e) => {
+        const items = e.clipboardData.items;
+        for (let item of items) {
+            if (item.type.indexOf('image') !== -1) {
+                processFile(item.getAsFile());
+                break;
+            }
+        }
+    });
+
+    // 이미지 분석 처리
+    function processFile(file) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+                canvas.width = img.width;
+                canvas.height = img.height;
+                ctx.drawImage(img, 0, 0);
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    let url = code.data;
+                    if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+
+                    displayResult(url);
+                    addHistory(url);
+                } else {
+                    resultBox.innerHTML = '<span style="color: #e53e3e; text-align: center;">QR 코드를 인식하지 못했습니다.</span>';
+                }
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+    }
+
+    // 결과 출력 UI
+    function displayResult(url) {
+        resultBox.innerHTML = `
+            <div class="link-wrapper">
+                <a href="${url}" target="_blank" rel="noopener noreferrer" id="targetLink">${url}</a>
+                <button class="btn-sm" onclick="copyLink('${url}')">복사</button>
+            </div>
+        `;
+    }
+
+    // 원클릭 복사
+    function copyLink(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('클립보드에 복사되었습니다.');
+        });
+    }
+
+    // 히스토리 관리
+    function addHistory(url) {
+        history = [url, ...history.filter(item => item !== url)].slice(0, 5);
+        localStorage.setItem('qr_history', JSON.stringify(history));
+        renderHistory();
+    }
+
+    function renderHistory() {
+        historyList.innerHTML = history.length === 0 
+            ? '<li style="color:#a0aec0;">기록 없음</li>' 
+            : history.map(url => `<li><a href="${url}" target="_blank">${url}</a></li>`).join('');
+    }
+
+    // --- 우측: URL ➔ QR 코드 생성 ---
+    function generateQRCode() {
+        const urlInput = document.getElementById('urlInput').value.trim();
+        const qrcodeContainer = document.getElementById('qrcode');
+        qrcodeContainer.innerHTML = '';
+
+        if (!urlInput) {
+            alert('URL을 입력해주세요.');
+            return;
+        }
+
+        new QRCode(qrcodeContainer, {
+            text: urlInput,
+            width: 160,
+            height: 160,
+            colorDark: "#000000",
+            colorLight: "#ffffff",
+            correctLevel: QRCode.CorrectLevel.H
+        });
+    }
+</script>
+
+</body>
+</html>
